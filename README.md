@@ -332,5 +332,3 @@ For questions, issues, or suggestions:
 - **Time Limit:** 60 seconds
 - **Passing Score:** 70%
 - **Platforms:** Android, iOS, Web, Desktop
-
----
