@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'SF Pro Display',
       ),
-      home: const QuizScreen(),
+      home: const HomeScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -30,18 +30,147 @@ class MyApp extends StatelessWidget {
 
 class Question {
   final String questionText;
-  final List<String> answers;
-  final int correctAnswerIndex;
+  final List<String>? answers; 
+  final int? correctAnswerIndex; 
+  final String? correctTextAnswer;
+  final String type; 
 
   Question({
     required this.questionText,
-    required this.answers,
-    required this.correctAnswerIndex,
+    required this.type,
+    this.answers,
+    this.correctAnswerIndex,
+    this.correctTextAnswer,
   });
 }
 
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  void startQuiz() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QuizScreen(
+            userName: _nameController.text.trim(),
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(
+                    Icons.person_outline,
+                    size: 72,
+                    color: Color(0xFF2563EB),
+                  ),
+                  const SizedBox(height: 24),
+
+                  const Text(
+                    'Welcome!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  Text(
+                    'Enter your name or nickname',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 32),
+
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: startQuiz,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Continue',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class QuizScreen extends StatefulWidget {
-  const QuizScreen({super.key});
+  final String userName;
+  
+
+  const QuizScreen({
+    super.key,
+    required this.userName,
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -53,8 +182,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   int currentQuestionIndex = 0;
   int score = 0;
   int? selectedAnswerIndex;
+  bool? isTextAnswerCorrect;
   bool isAnswered = false;
   bool quizEnded = false;
+  final TextEditingController _textController = TextEditingController();
   
   // Timer variables
   Timer? _timer;
@@ -66,62 +197,34 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
 
   // Quiz questions
   final List<Question> questions = [
-    Question(
-      questionText:
-          'Why do business use automation?',
-      answers: [
-        'Reducing manual, repetitive tasks',
-        'Increasing costs',
-        'Ensuring compliance to government rules',
-        'Increasing workload for employees',
-      ],
-      correctAnswerIndex: 0,
-    ),
-    Question(
-      questionText:
-          'What is an example of an AI innovation in businesses?',
-      answers: [
-        'Holding meetings through online platforms',
-        'A chatbot for customer support',
-        'Able to remotely accessing data',
-        'A word processor',
-      ],
-      correctAnswerIndex: 1,
-    ),
-    Question(
-      questionText:
-          'Why do businesses integrate cloud services?',
-      answers: [
-        'To print documents faster',
-        'To improve customer support',
-        'To comply with industry standards',
-        'To store and access data through the internet',
-      ],
-      correctAnswerIndex: 3, // FIXED: Changed from 2 to 3
-    ),
-    Question(
-      questionText:
-          'What does RPA stand for in business automation?', // FIXED: Changed "Why does" to "What does"
-      answers: [
-        'Robotic Process Automation',
-        'Remote Process Automation',
-        'Repetitive Process Automation',
-        'Rapid Process Automation',
-      ],
-      correctAnswerIndex: 0,
-    ),
-     Question(
-      questionText:
-          'What is the primary purpose of a company conducting a SWOT analysis?',
-      answers: [
-        'To audit its quarterly financial statements',
-        'To identify internal Strengths and Weaknesses, and external Opportunities and Threats',
-        'To set the annual holiday schedule for employees',
-        'To design the company\'s logo and branding materials',
-      ],
-      correctAnswerIndex: 1,
-    ),
-  ];
+  Question(
+    questionText: 'Why do business use automation?',
+    type: 'mcq',
+    answers: [
+      'Reducing manual, repetitive tasks',
+      'Increasing costs',
+      'Ensuring compliance to government rules',
+      'Increasing workload for employees',
+    ],
+    correctAnswerIndex: 0,
+  ),
+  Question(
+    questionText: 'What tool is used in the assessment of internal and external factors that affect a business?',
+    type: 'text',
+    correctTextAnswer: 'swot',
+  ),
+  Question(
+    questionText: 'What does RPA stand for in business automation?',
+    type: 'mcq',
+    answers: [
+      'Robotic Process Automation',
+      'Remote Process Automation',
+      'Repetitive Process Automation',
+      'Rapid Process Automation',
+    ],
+    correctAnswerIndex: 0,
+  ),
+];
 
   @override
   void initState() {
@@ -144,6 +247,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   void dispose() {
     _timer?.cancel();
     _fadeController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
@@ -188,6 +292,23 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     }
   }
 
+  void submitTextAnswer() {
+  final userAnswer = _textController.text.trim().toLowerCase();
+  final correctAnswer =
+      questions[currentQuestionIndex].correctTextAnswer!.toLowerCase();
+
+  setState(() {
+    isAnswered = true;
+
+    if (userAnswer == correctAnswer) {
+      score++;
+      isTextAnswerCorrect = true;
+    } else {
+      isTextAnswerCorrect = false;
+    }
+  });
+}
+
   void nextQuestion() {
     _fadeController.forward(from: 0);
     setState(() {
@@ -195,6 +316,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         currentQuestionIndex++;
         selectedAnswerIndex = null;
         isAnswered = false;
+        isTextAnswerCorrect = null;
+        _textController.clear();
       } else {
         quizEnded = true;
         _timer?.cancel();
@@ -277,9 +400,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
               
               // Subtitle
               Text(
-                'Let\'s test your knowledge!',
+                'Let\'s test your knowledge, ${widget.userName}!',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 25,
                   color: Colors.grey[600],
                   height: 1.5,
                 ),
@@ -490,102 +613,90 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                   const SizedBox(height: 32),
 
                   // Answers
-                  ...List.generate(question.answers.length, (index) {
-                    final isCorrect = index == question.correctAnswerIndex;
-                    final isSelected = selectedAnswerIndex == index;
-                    final showCorrect = isAnswered && isCorrect;
-                    final showWrong = isAnswered && isSelected && !isCorrect;
+                 // Answers
 
-                    Color backgroundColor = Colors.white;
-                    Color borderColor = const Color(0xFFE2E8F0);
-                    Color textColor = const Color(0xFF0F172A);
+// Multiple Choice Question
+if (question.type == 'mcq') ...[
+  ...List.generate(question.answers!.length, (index) {
+    final isCorrect = index == question.correctAnswerIndex;
+    final isSelected = selectedAnswerIndex == index;
+    final showCorrect = isAnswered && isCorrect;
+    final showWrong = isAnswered && isSelected && !isCorrect;
 
-                    if (showCorrect) {
-                      backgroundColor = const Color(0xFFDCFCE7);
-                      borderColor = const Color(0xFF22C55E);
-                      textColor = const Color(0xFF166534);
-                    } else if (showWrong) {
-                      backgroundColor = const Color(0xFFFEE2E2);
-                      borderColor = const Color(0xFFEF4444);
-                      textColor = const Color(0xFF991B1B);
-                    } else if (isSelected && !isAnswered) {
-                      borderColor = const Color(0xFF2563EB);
-                    }
+    Color backgroundColor = Colors.white;
+    Color borderColor = const Color(0xFFE2E8F0);
+    Color textColor = const Color(0xFF0F172A);
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Material(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(16),
-                        child: InkWell(
-                          onTap: isAnswered ? null : () => selectAnswer(index),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: borderColor, width: 1.5),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                // Letter Circle
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: showCorrect || showWrong
-                                        ? (showCorrect ? const Color(0xFF22C55E) : const Color(0xFFEF4444))
-                                        : const Color(0xFFF1F5F9),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      String.fromCharCode(65 + index),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                        color: showCorrect || showWrong
-                                            ? Colors.white
-                                            : const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                
-                                // Answer Text
-                                Expanded(
-                                  child: Text(
-                                    question.answers[index],
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      height: 1.5,
-                                      color: textColor,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                                
-                                // Check/X Icon
-                                if (showCorrect)
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Color(0xFF22C55E),
-                                    size: 24,
-                                  ),
-                                if (showWrong)
-                                  const Icon(
-                                    Icons.cancel,
-                                    color: Color(0xFFEF4444),
-                                    size: 24,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+    if (showCorrect) {
+      backgroundColor = const Color(0xFFDCFCE7);
+      borderColor = const Color(0xFF22C55E);
+      textColor = const Color(0xFF166534);
+    } else if (showWrong) {
+      backgroundColor = const Color(0xFFFEE2E2);
+      borderColor = const Color(0xFFEF4444);
+      textColor = const Color(0xFF991B1B);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: isAnswered ? null : () => selectAnswer(index),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            border: Border.all(color: borderColor, width: 1.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            question.answers![index],
+            style: TextStyle(
+              fontSize: 15,
+              color: textColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }),
+],
+
+// Identification / Text Question
+if (question.type == 'text') ...[
+  TextFormField(
+    controller: _textController,
+    enabled: !isAnswered,
+    decoration: InputDecoration(
+      labelText: 'Your Answer',
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
+  ),
+  const SizedBox(height: 24),
+  SizedBox(
+    height: 56,
+    child: ElevatedButton(
+  onPressed: isAnswered ? null : submitTextAnswer,
+  style: ElevatedButton.styleFrom(
+    backgroundColor: !isAnswered
+        ? const Color(0xFF2563EB)
+        : isTextAnswerCorrect == true
+            ? const Color(0xFF22C55E) // green
+            : const Color(0xFFEF4444), // red
+    foregroundColor: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+  ),
+      child: const Text(
+        'Submit Answer',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      ),
+    ),
+  ),
+],
 
                   // Next Button
                   if (isAnswered) ...[
@@ -682,10 +793,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
               // Result Title
               Text(
                 isPerfect
-                    ? 'Perfect Score!'
+                    ? 'Perfect Score, ${widget.userName}!'
                     : isPassing
-                        ? 'Well Done!'
-                        : 'Keep Practicing!',
+                        ? 'Well Done, ${widget.userName}!'
+                        : 'Keep Practicing, ${widget.userName}!',
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
